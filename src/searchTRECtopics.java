@@ -14,6 +14,7 @@ import java.io.FileWriter;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 
 import org.apache.lucene.benchmark.quality.trec.TrecTopicsReader;
@@ -22,11 +23,11 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
-import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.queryparser.xml.builders.BooleanQueryBuilder;
+import org.apache.lucene.search.*;
 import org.apache.lucene.search.similarities.ClassicSimilarity;
 import org.apache.lucene.search.similarities.Similarity;
 import org.apache.lucene.store.FSDirectory;
@@ -54,8 +55,28 @@ public class searchTRECtopics {
 		String relevancePath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/input/feedback.51-100.txt";
 
 		searchTRECtopics sObj = new searchTRECtopics(indexPath, outputPath, topicsPath, relevancePath);
+//		sObj.queryTest();
 		sObj.generateTopicResult(new ClassicSimilarity());
 	}
+
+	public void queryTest() throws ParseException, IOException {
+
+		searcher.setSimilarity(new ClassicSimilarity());
+
+		Analyzer analyzer = new StandardAnalyzer();
+		QueryParser parser = new QueryParser("TEXT", analyzer);
+		BoostQuery boosted_query = new BoostQuery(new TermQuery(new Term("TEXT", "airbus")), 10.0f);
+		System.out.println(boosted_query);
+		ScoreDoc[] t = searcher.search(boosted_query, 15).scoreDocs;
+
+		for(ScoreDoc d: t) {
+			String docKey = searcher.doc(d.doc).get("DOCNO");
+			double score = (double) d.score;
+			System.out.println("DOCNO: " + docKey + " SCORE: " + score);
+		}
+	}
+
+
 
 	public void generateTopicResult(Similarity sim) throws ParseException, IOException {
 
@@ -80,8 +101,7 @@ public class searchTRECtopics {
 			  "<smry> " was removed from <desc> query since parser was unable to parse it
 			 */
 			String titleQuery = query.getValue("title").replaceFirst("[Tt][Oo][Pp][Ii][Cc]:", "").replace("/", " ");
-
-
+//			shortQueryMap = getSimilarityScores(titleQuery, sim);
 			shortQueryMap = getSimilarityScores(titleQuery, qId);
 			shortQueryTxt += toText(shortQueryMap, qId, fname);
 		}
@@ -119,7 +139,7 @@ public class searchTRECtopics {
 		String zone = "TEXT", rocchio_query;;
 		ClassicSimilarity sim = new ClassicSimilarity();
 		myRelevanceParser rel_parser = new myRelevanceParser(relevancePath);
-		MyRocchio rocchioObj = new MyRocchio(1, 0.75, 0.15);
+		MyRocchio rocchioObj = new MyRocchio();
 
 		query_feedback = rel_parser.parseData().get(qId);
 		rocchio_query = rocchioObj.getRocchioQuery(queryString, query_feedback);

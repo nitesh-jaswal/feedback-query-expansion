@@ -7,6 +7,7 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 
@@ -15,22 +16,22 @@ import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.benchmark.quality.QualityQuery;
 import org.apache.lucene.benchmark.quality.trec.TrecTopicsReader;
 import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
-import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.Query;
+import org.apache.lucene.queryparser.xml.builders.BooleanQueryBuilder;
+import org.apache.lucene.search.*;
 
 public class MyRocchio {
-    private double alpha = 1, beta = 0.75, gamma = 0.15;
+    private float alpha = 1.0f, beta = 1.0f, gamma = 0.0f;
     private IndexReader reader;
     private String  relevanceIndexPath;
 
-//    public MyRocchio() {
-//        reader = s;
-//        relevanceIndexPath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/out/relevance_index/";
-//    }
+    public MyRocchio() {
 
-    public MyRocchio(double a, double b, double g) {
+    }
+
+    public MyRocchio(float a, float b, float g) {
         alpha = a;
         beta = b;
         gamma = g;
@@ -43,7 +44,7 @@ public class MyRocchio {
     public String getRocchioQuery(String queryString, HashMap<String, ArrayList<String>> query_feedback) throws ParseException {
         String rocchioQuery = "";
         int n_docs;
-        HashMap<String, HashMap<String, Double>> rocchioQueryMap = new HashMap<>();
+        HashMap<String, HashMap<String, Float>> rocchioQueryMap = new HashMap<>();
 //         COMPUTE Q0
         rocchioQueryMap.put("Q0", generateQueryMap(queryString));
 //         COMPUTE RELEVANT CENTROID
@@ -51,52 +52,79 @@ public class MyRocchio {
 //         COMPUTE IRRELEVANT CENTROID
         rocchioQueryMap.put("IRR", generateQueryMap(query_feedback.get("IRR"), "IRR"));
 
-        rocchioQuery = mapToQueryString(rocchioQueryMap);
+        rocchioQuery = mapToQueryString(rocchioQueryMap).trim();
+        System.out.println("ORIGINAL QUERY: " + queryString);
+        System.out.println("BOOSTED QUERY: " + rocchioQuery);
         return(rocchioQuery);
     }
 
-    private HashMap<String, Double> generateQueryMap(String queryString) {
-        HashMap<String, Double> map = new HashMap<>();
+    private HashMap<String, Float> generateQueryMap(String queryString) {
+        HashMap<String, Float> map = new HashMap<>();
         String[] terms;
         terms = queryString.trim().split("\\s");
         for (String term: terms) {
-            if(map.containsKey("term"))
-                map.replace(term, map.get(term) + 1.0*alpha);
-            else
-                map.put(term, 1.0*alpha);
+            term = term.toLowerCase().trim().replaceAll("[,;:'\"(){}]", "");
+            if(term.equals("") || term.equals(" ") || term.equals("\n"))
+                continue;
+            map.put(term, 1.0f*alpha);
         }
         return(map);
     }
 
-    private HashMap<String, Double> generateQueryMap(ArrayList<String> queryStrings, String doc_type) {
-        HashMap<String, Double> map = new HashMap<>();
+    private HashMap<String, Float> generateQueryMap(ArrayList<String> queryStrings, String doc_type) {
+        HashMap<String, Float> map = new HashMap<>();
         String[] terms;
-        double boost_factor = (doc_type.equalsIgnoreCase("REL"))?beta:gamma;
+        Float boost_factor = (doc_type.equalsIgnoreCase("REL"))?beta:gamma;
         int n_docs = queryStrings.size();
         for(String queryString: queryStrings) {
             terms = queryString.trim().split("\\s");
+            // TODO: Make sure to not add when same terms occour in same document but add them when same terms occour in different documents
             for (String term: terms) {
-                if(map.containsKey("term"))
-                    map.replace(term, map.get(term) + 1.0*boost_factor/n_docs);
-                else
-                    map.put(term, 1.0*boost_factor/n_docs);
+                term = term.toLowerCase().trim().replaceAll("[,;:'\"(){}]", "");
+                if(term.equals("") || term.equals(" ") || term.equals("\n"))
+                    continue;
+                map.put(term, 1.0f*boost_factor/n_docs);
             }
         }
         return(map);
     }
 
-    private String mapToQueryString(HashMap<String, HashMap<String, Double>> mapHashMap) {
+    private String mapToQueryString(HashMap<String, HashMap<String, Float>> mapHashMap) throws NullPointerException{
         String rocchioQuery = "";
+        LinkedHashMap<String, Float> final_map = new LinkedHashMap<>();
+        LinkedHashMap<String, Float> sorted_final_map = new LinkedHashMap<>();
 
         for(String key: mapHashMap.keySet()) {
-            HashMap<String, Double> map = mapHashMap.get(key);
+            HashMap<String, Float> map = mapHashMap.get(key);
             for(String term: map.keySet()) {
-
+                if(final_map.containsKey(term))
+                    final_map.put(term, final_map.get(term) + map.get(term));
+                else
+                    final_map.put(term, map.get(term));
             }
+        }
+        sorted_final_map = final_map.entrySet().stream().limit(10).
+                collect(LinkedHashMap::new, (k, v) -> k.put(v.getKey(), v.getValue()), LinkedHashMap::putAll);
+
+        for(String term: sorted_final_map.keySet()){
+            if(!(term.equals(" ") || term.equals("") || term == null))
+                rocchioQuery += term + "^" + roundAvoid(sorted_final_map.get(term), 1) + " ";
         }
         return (rocchioQuery);
     }
 
+    private void usingQueryBuilder(HashMap<String, Float> map) {
+        BooleanQuery.Builder builder = new BooleanQuery.Builder();
 
+        for(String term: map.keySet()) {
+            BoostQuery boosted_query = new BoostQuery(new TermQuery(new Term("TEXT", term)), map.get(term));
+        }
+
+    }
+
+    public static float roundAvoid(float value, int places) {
+        float scale = (float) Math.pow(10, places);
+        return(Math.round(value * scale) / scale);
+    }
 
 }
