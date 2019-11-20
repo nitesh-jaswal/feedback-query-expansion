@@ -74,16 +74,25 @@ public class MyRocchio {
     private HashMap<String, Float> generateQueryMap(ArrayList<String> queryStrings, String doc_type) {
         HashMap<String, Float> map = new HashMap<>();
         String[] terms;
+        // Select which hyper-parameter to multiply depending on relevancy of document
         Float boost_factor = (doc_type.equalsIgnoreCase("REL"))?beta:gamma;
         int n_docs = queryStrings.size();
         for(String queryString: queryStrings) {
+            HashMap<String, Float> temp_map = new HashMap<>();
             terms = queryString.trim().split("\\s");
             // TODO: Make sure to not add when same terms occour in same document but add them when same terms occour in different documents
             for (String term: terms) {
                 term = term.toLowerCase().trim().replaceAll("[,;:'\"(){}]", "");
                 if(term.equals("") || term.equals(" ") || term.equals("\n"))
                     continue;
-                map.put(term, 1.0f*boost_factor/n_docs);
+                temp_map.put(term, 1.0f*boost_factor/n_docs);
+            }
+            // Input the temp_map into you main HashMap
+            for (String term: temp_map.keySet()) {
+                if(map.containsKey(term))
+                    map.replace(term, map.get(term) + temp_map.get(term));
+                else
+                    map.replace(term, temp_map.get(term));
             }
         }
         return(map);
