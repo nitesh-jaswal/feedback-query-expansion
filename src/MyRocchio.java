@@ -8,15 +8,30 @@ import java.io.FileWriter;
 
 
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.benchmark.quality.QualityQuery;
 import org.apache.lucene.benchmark.quality.trec.TrecTopicsReader;
-public class MyRocchio {
-    private double alpha, beta, gamma;
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.queryparser.classic.ParseException;
+import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.Query;
 
-    public MyRocchio() {
-        alpha = 1;
-        beta = 0.75;
-        gamma = 0.15;
+public class MyRocchio {
+    private double alpha = 1, beta = 0.75, gamma = 0.15;
+    private IndexReader reader;
+    private String  relevanceIndexPath;
+
+//    public MyRocchio() {
+//        reader = s;
+//        relevanceIndexPath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/out/relevance_index/";
+//    }
+
+    public MyRocchio(double a, double b, double g, String r) {
+        alpha = a;
+        beta = b;
+        gamma = g;
+        relevanceIndexPath = r;
     }
 
     public static void main(String[] args) throws IOException{
@@ -35,4 +50,15 @@ public class MyRocchio {
         System.out.println(titleQuery + "\n" + relevantQuery + "\n" + irrelevantQuery);
         System.out.println("Hi from eclipse!");
     }
+
+    public Query getRocchioQuery(String queryString) throws ParseException {
+
+        Analyzer analyzer = new StandardAnalyzer();
+        QueryParser parser = new QueryParser("TEXT", analyzer);
+        Query query = parser.parse(queryString);
+        return(query);
+    }
+
+
+
 }

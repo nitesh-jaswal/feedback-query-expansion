@@ -41,7 +41,7 @@ public class easySearch {
 	
 	public static void main(String[] args)  throws ParseException, IOException {
 		String queryString = "Donald Trump";
-		easySearch obj = new easySearch("F:\\Current Study\\Search\\Assignment 2\\retrieval-and-eval\\index");
+		easySearch obj = new easySearch("/home/nitesh/Study/Search/Assignment 3/Search_HW3/input/index/");
 		System.out.println("Searching for query: " + queryString);
 		System.out.println("Searching in: " + "TEXT");
 //		obj.testSimilarity(queryString, "TEXT");

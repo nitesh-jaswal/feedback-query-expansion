@@ -1,3 +1,10 @@
+/*
+	Note: This class has been modified to only work on short queries. The original class was designed
+	to work on both long and short queries.
+	Author: Nitesh Singh Jaswal
+	Date: 16/11/2019
+ */
+
 import java.io.IOException;
 import java.io.File;
 import java.io.FileReader;
@@ -24,6 +31,7 @@ import org.apache.lucene.store.FSDirectory;
 public class searchTRECtopics {
 	private String indexPath, outputPath, topicsPath;
 	private IndexReader reader;
+	private IndexSearcher searcher;
 	public enum ENTRIES {TOP5, TOP10, TOP20, TOP100, TOP1000, ALL};
 	
 	public searchTRECtopics(String i, String o, String t) throws IOException {
@@ -32,26 +40,30 @@ public class searchTRECtopics {
 		topicsPath = t;
 		reader = DirectoryReader.open(FSDirectory.open(Paths
 				.get(indexPath)));
+		searcher = new IndexSearcher(reader);
 	}
 	
 	public static void main(String[] args) throws IOException, ParseException {
-		String indexPath = "F:\\Current Study\\Search\\Assignment 2\\retrieval-and-eval\\index";
-		String outputPath = "F:\\Current Study\\Search\\Assignment 2\\retrieval-and-eval\\out\\";
-		String topicsPath = "F:\\Current Study\\Search\\Assignment 2\\retrieval-and-eval\\topics.51-100";
+		String indexPath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/input/index/";
+		String topicsPath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/input/topics.51-100";
+		String outputPath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/out/";
+
 		searchTRECtopics sObj = new searchTRECtopics(indexPath, outputPath, topicsPath);
 		sObj.generateTopicResult(null);
 	}
 	
 	public void generateTopicResult(Similarity sim) throws ParseException, IOException {
-		
-		LinkedHashMap<String, Double> shortQueryMap, longQueryMap;
+
+//		MyRocchio rObj = new MyRocchio();
+
+		LinkedHashMap<String, Double> shortQueryMap;
 		String fname = getFileName(sim);
 		File file = new File(topicsPath);
 		TrecTopicsReader topics = new TrecTopicsReader();
-				
-		QualityQuery myQueries[] = topics.readQueries(new BufferedReader(new FileReader(file)));
+
+		QualityQuery[] myQueries = topics.readQueries(new BufferedReader(new FileReader(file)));
 		
-		String shortQueryTxt = "", longQueryTxt = "";
+		String shortQueryTxt = "";
 		
 		for(QualityQuery query: myQueries) {
 			// qId returned is of format "051" and we need "51"
@@ -59,33 +71,29 @@ public class searchTRECtopics {
 			/* 
 			  Error was raised due to presence of "/" character
 			  "Topic: " was removed from <title> query
-			  "<smry> " was removed from <desc> query since parser was unable to parse it 
 			 */
 			String titleQuery = query.getValue("title").replaceFirst("[Tt][Oo][Pp][Ii][Cc]:", "").replace("/", " ");
-			String descQuery = query.getValue("description").split("<smry>")[0].replace("/", " ");
-			shortQueryMap = getSimilarityScores(titleQuery, sim);
-			longQueryMap = getSimilarityScores(descQuery, sim);
-			shortQueryTxt += toText(shortQueryMap, qId, fname);
-			longQueryTxt += toText(longQueryMap, qId, fname);
+
+//			query = .getRochhioQuery(titleQuery);
+//			shortQueryMap = getSimilarityScores(titleQuery, sim);
+//			shortQueryTxt += toText(shortQueryMap, qId, fname);
 		}
 		writeToFile(outputPath + fname + "shortQuery.txt", shortQueryTxt);
-		writeToFile(outputPath + fname + "longQuery.txt", longQueryTxt);
 	}
 	
-	private LinkedHashMap<String, Double> getSimilarityScores(String queryString, Similarity sim) throws ParseException, IOException {
+	private LinkedHashMap<String, Double> getSimilarityScores(Query query, Similarity sim) throws ParseException, IOException {
+		/*
+		 TODO: Modify so that getSimilarityScores() calls a myRochhio query expander object that expands the query.
+		*/
+
 		LinkedHashMap<String, Double> docScore = new LinkedHashMap<String, Double>();
 		String zone = "TEXT";
 		
 		if(sim == null) {
-			easySearch obj = new easySearch(indexPath);
-			docScore = getTopX(obj.calculateScores(zone, queryString), ENTRIES.TOP1000);
+			System.out.println("Pass Similarity Function. Terminating...");
+			System.exit(0);
 		}
 		else {
-			IndexSearcher searcher = new IndexSearcher(reader);
-			Analyzer analyzer = new StandardAnalyzer();
-			QueryParser parser = new QueryParser(zone, analyzer);
-			Query query = parser.parse(queryString);
-			
 			searcher.setSimilarity(sim);
 			ScoreDoc[] t = searcher.search(query, 1000).scoreDocs;
 			
@@ -154,14 +162,20 @@ public class searchTRECtopics {
 		String f = "";
 		if(sim != null) {
 			String cname = sim.getClass().getName();
-			if(cname.equals("org.apache.lucene.search.similarities.ClassicSimilarity"))
-				f = "VectorSpace";
-			else if(cname.equals("org.apache.lucene.search.similarities.BM25Similarity"))
-				f = "BM25";
-			else if(cname.equals("org.apache.lucene.search.similarities.LMDirichletSimilarity"))
-				f = "LMDrichlet";
-			else if(cname.equals("org.apache.lucene.search.similarities.LMJelinekMercerSimilarity"))
-				f = "LMJelinkMercer";
+			switch (cname) {
+				case "org.apache.lucene.search.similarities.ClassicSimilarity":
+					f = "VectorSpace";
+					break;
+				case "org.apache.lucene.search.similarities.BM25Similarity":
+					f = "BM25";
+					break;
+				case "org.apache.lucene.search.similarities.LMDirichletSimilarity":
+					f = "LMDrichlet";
+					break;
+				case "org.apache.lucene.search.similarities.LMJelinekMercerSimilarity":
+					f = "LMJelinkMercer";
+					break;
+			}
 		}
 		else
 			f = "EasySearch";

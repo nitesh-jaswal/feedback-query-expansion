@@ -11,9 +11,9 @@ import org.apache.lucene.search.similarities.LMJelinekMercerSimilarity;
 public class compareAlgorithms {
 
 	public static void main(String[] args) throws IOException, ParseException {
-		String indexPath = "F:\\Current Study\\Search\\Assignment 2\\retrieval-and-eval\\index";
-		String outputPath = "F:\\Current Study\\Search\\Assignment 2\\retrieval-and-eval\\out\\";
-		String topicsPath = "F:\\Current Study\\Search\\Assignment 2\\retrieval-and-eval\\topics.51-100";
+        String indexPath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/input/index/";
+        String topicsPath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/input/topics.51-100";
+        String outputPath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/out/";
 		
 		searchTRECtopics sObj = new searchTRECtopics(indexPath, outputPath, topicsPath);
 		
