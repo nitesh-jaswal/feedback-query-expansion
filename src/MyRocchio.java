@@ -5,6 +5,9 @@ import java.io.FileReader;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 
 import org.apache.lucene.analysis.Analyzer;
@@ -27,36 +30,71 @@ public class MyRocchio {
 //        relevanceIndexPath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/out/relevance_index/";
 //    }
 
-    public MyRocchio(double a, double b, double g, String r) {
+    public MyRocchio(double a, double b, double g) {
         alpha = a;
         beta = b;
         gamma = g;
-        relevanceIndexPath = r;
     }
 
     public static void main(String[] args) throws IOException{
-        String relevancePath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/input/feedback.51-100.txt";
-        String indexPath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/input/index/";
-        String topicsPath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/input/topics.51-100";
 
-        File file = new File(relevancePath);
-        TrecTopicsReader topicReader = new TrecTopicsReader();
-        QualityQuery[] myQueries = topicReader.readQueries(new BufferedReader(new FileReader(file)));
-
-        String titleQuery = myQueries[0].getValue("title");
-        String relevantQuery = myQueries[0].getNames()[2];
-        String irrelevantQuery = myQueries[0].getValue("irrelevant");
-
-        System.out.println(titleQuery + "\n" + relevantQuery + "\n" + irrelevantQuery);
-        System.out.println("Hi from eclipse!");
     }
 
-    public Query getRocchioQuery(String queryString) throws ParseException {
+    public String getRocchioQuery(String queryString, HashMap<String, ArrayList<String>> query_feedback) throws ParseException {
+        String rocchioQuery = "";
+        int n_docs;
+        HashMap<String, HashMap<String, Double>> rocchioQueryMap = new HashMap<>();
+//         COMPUTE Q0
+        rocchioQueryMap.put("Q0", generateQueryMap(queryString));
+//         COMPUTE RELEVANT CENTROID
+        rocchioQueryMap.put("REL", generateQueryMap(query_feedback.get("REL"), "REL"));
+//         COMPUTE IRRELEVANT CENTROID
+        rocchioQueryMap.put("IRR", generateQueryMap(query_feedback.get("IRR"), "IRR"));
 
-        Analyzer analyzer = new StandardAnalyzer();
-        QueryParser parser = new QueryParser("TEXT", analyzer);
-        Query query = parser.parse(queryString);
-        return(query);
+        rocchioQuery = mapToQueryString(rocchioQueryMap);
+        return(rocchioQuery);
+    }
+
+    private HashMap<String, Double> generateQueryMap(String queryString) {
+        HashMap<String, Double> map = new HashMap<>();
+        String[] terms;
+        terms = queryString.trim().split("\\s");
+        for (String term: terms) {
+            if(map.containsKey("term"))
+                map.replace(term, map.get(term) + 1.0*alpha);
+            else
+                map.put(term, 1.0*alpha);
+        }
+        return(map);
+    }
+
+    private HashMap<String, Double> generateQueryMap(ArrayList<String> queryStrings, String doc_type) {
+        HashMap<String, Double> map = new HashMap<>();
+        String[] terms;
+        double boost_factor = (doc_type.equalsIgnoreCase("REL"))?beta:gamma;
+        int n_docs = queryStrings.size();
+        for(String queryString: queryStrings) {
+            terms = queryString.trim().split("\\s");
+            for (String term: terms) {
+                if(map.containsKey("term"))
+                    map.replace(term, map.get(term) + 1.0*boost_factor/n_docs);
+                else
+                    map.put(term, 1.0*boost_factor/n_docs);
+            }
+        }
+        return(map);
+    }
+
+    private String mapToQueryString(HashMap<String, HashMap<String, Double>> mapHashMap) {
+        String rocchioQuery = "";
+
+        for(String key: mapHashMap.keySet()) {
+            HashMap<String, Double> map = mapHashMap.get(key);
+            for(String term: map.keySet()) {
+
+            }
+        }
+        return (rocchioQuery);
     }
 
 

@@ -1,5 +1,4 @@
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.*;
 
@@ -67,8 +66,6 @@ public class myRelevanceParser {
         }
 
         sc.close();
-        System.out.println(map_key);
-
         return(map_key);
     }
 

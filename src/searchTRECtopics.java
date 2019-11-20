@@ -12,6 +12,8 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 
 import org.apache.lucene.benchmark.quality.trec.TrecTopicsReader;
@@ -25,78 +27,83 @@ import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.similarities.ClassicSimilarity;
 import org.apache.lucene.search.similarities.Similarity;
 import org.apache.lucene.store.FSDirectory;
 
 public class searchTRECtopics {
-	private String indexPath, outputPath, topicsPath;
+	private String indexPath, outputPath, topicsPath, relevancePath;
 	private IndexReader reader;
 	private IndexSearcher searcher;
 	public enum ENTRIES {TOP5, TOP10, TOP20, TOP100, TOP1000, ALL};
-	
-	public searchTRECtopics(String i, String o, String t) throws IOException {
+
+	public searchTRECtopics(String i, String o, String t, String r) throws IOException {
 		indexPath = i;
 		outputPath = o;
 		topicsPath = t;
+		relevancePath = r;
 		reader = DirectoryReader.open(FSDirectory.open(Paths
 				.get(indexPath)));
 		searcher = new IndexSearcher(reader);
 	}
-	
+
 	public static void main(String[] args) throws IOException, ParseException {
 		String indexPath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/input/index/";
 		String topicsPath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/input/topics.51-100";
 		String outputPath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/out/";
+		String relevancePath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/input/feedback.51-100.txt";
 
-		searchTRECtopics sObj = new searchTRECtopics(indexPath, outputPath, topicsPath);
-		sObj.generateTopicResult(null);
+		searchTRECtopics sObj = new searchTRECtopics(indexPath, outputPath, topicsPath, relevancePath);
+		sObj.generateTopicResult(new ClassicSimilarity());
 	}
-	
+
 	public void generateTopicResult(Similarity sim) throws ParseException, IOException {
 
-//		MyRocchio rObj = new MyRocchio();
-
 		LinkedHashMap<String, Double> shortQueryMap;
+		HashMap<Integer, HashMap<String, ArrayList<String>>> feedback = new HashMap<>();
+		HashMap<String, ArrayList<String>> query_feedback = new HashMap<>();
 		String fname = getFileName(sim);
+
 		File file = new File(topicsPath);
 		TrecTopicsReader topics = new TrecTopicsReader();
 
-		QualityQuery[] myQueries = topics.readQueries(new BufferedReader(new FileReader(file)));
-		
+		QualityQuery myQueries[] = topics.readQueries(new BufferedReader(new FileReader(file)));
+
 		String shortQueryTxt = "";
-		
+
 		for(QualityQuery query: myQueries) {
 			// qId returned is of format "051" and we need "51"
 			int qId = Integer.parseInt(query.getQueryID());
-			/* 
+			/*
 			  Error was raised due to presence of "/" character
 			  "Topic: " was removed from <title> query
+			  "<smry> " was removed from <desc> query since parser was unable to parse it
 			 */
 			String titleQuery = query.getValue("title").replaceFirst("[Tt][Oo][Pp][Ii][Cc]:", "").replace("/", " ");
 
-//			query = .getRochhioQuery(titleQuery);
-//			shortQueryMap = getSimilarityScores(titleQuery, sim);
-//			shortQueryTxt += toText(shortQueryMap, qId, fname);
+
+			shortQueryMap = getSimilarityScores(titleQuery, qId);
+			shortQueryTxt += toText(shortQueryMap, qId, fname);
 		}
 		writeToFile(outputPath + fname + "shortQuery.txt", shortQueryTxt);
 	}
-	
-	private LinkedHashMap<String, Double> getSimilarityScores(Query query, Similarity sim) throws ParseException, IOException {
-		/*
-		 TODO: Modify so that getSimilarityScores() calls a myRochhio query expander object that expands the query.
-		*/
 
+	private LinkedHashMap<String, Double> getSimilarityScores(String queryString, Similarity sim) throws ParseException, IOException {
 		LinkedHashMap<String, Double> docScore = new LinkedHashMap<String, Double>();
 		String zone = "TEXT";
-		
+
 		if(sim == null) {
-			System.out.println("Pass Similarity Function. Terminating...");
-			System.exit(0);
+			easySearch obj = new easySearch(indexPath);
+			docScore = getTopX(obj.calculateScores(zone, queryString), ENTRIES.TOP1000);
 		}
 		else {
+			IndexSearcher searcher = new IndexSearcher(reader);
+			Analyzer analyzer = new StandardAnalyzer();
+			QueryParser parser = new QueryParser(zone, analyzer);
+			Query query = parser.parse(queryString);
 			searcher.setSimilarity(sim);
 			ScoreDoc[] t = searcher.search(query, 1000).scoreDocs;
-			
+
 			for(ScoreDoc d: t) {
 				String docKey = searcher.doc(d.doc).get("DOCNO");
 				double score = (double) d.score;
@@ -105,8 +112,34 @@ public class searchTRECtopics {
 		}
 		return(docScore);
 	}
-	
-	
+
+	private LinkedHashMap<String, Double> getSimilarityScores(String queryString, int qId) throws ParseException, IOException {
+		LinkedHashMap<String, Double> docScore = new LinkedHashMap<String, Double>();
+		HashMap<String, ArrayList<String>> query_feedback;
+		String zone = "TEXT", rocchio_query;;
+		ClassicSimilarity sim = new ClassicSimilarity();
+		myRelevanceParser rel_parser = new myRelevanceParser(relevancePath);
+		MyRocchio rocchioObj = new MyRocchio(1, 0.75, 0.15);
+
+		query_feedback = rel_parser.parseData().get(qId);
+		rocchio_query = rocchioObj.getRocchioQuery(queryString, query_feedback);
+		Analyzer analyzer = new StandardAnalyzer();
+		QueryParser parser = new QueryParser(zone, analyzer);
+
+		Query query = parser.parse(rocchio_query);
+		searcher.setSimilarity(sim);
+
+		ScoreDoc[] t = searcher.search(query, 1000).scoreDocs;
+
+		for(ScoreDoc d: t) {
+			String docKey = searcher.doc(d.doc).get("DOCNO");
+			double score = (double) d.score;
+			docScore.put(docKey, score);
+
+		}
+		return(docScore);
+	}
+
 	public void writeToFile(String path , String text) throws IOException {
 		File file = new File(path);
 		if(!file.exists()) {
@@ -114,10 +147,10 @@ public class searchTRECtopics {
 		}
 		FileWriter fw = new FileWriter(file.getAbsoluteFile());
 		BufferedWriter bw = new BufferedWriter(fw);
-        bw.write(text);
-        bw.close();
+		bw.write(text);
+		bw.close();
 	}
-	
+
 	public String toText(LinkedHashMap<String, Double> docScore, int qId, String algoName) {
 		String txt = "";
 		int i = 1;
@@ -131,51 +164,45 @@ public class searchTRECtopics {
 	public LinkedHashMap<String, Double> getTopX(LinkedHashMap<String, Double> scoreDoc, ENTRIES e) {
 		LinkedHashMap<String, Double> topXScoreDoc;
 		switch(e) {
-		case TOP5:		topXScoreDoc = scoreDoc.entrySet().stream().limit(5).
-											collect(LinkedHashMap::new, (k, v) -> k.put(v.getKey(), v.getValue()), LinkedHashMap::putAll);
-						break;
-		case TOP10: 	topXScoreDoc = scoreDoc.entrySet().stream().limit(10).
-											collect(LinkedHashMap::new, (k, v) -> k.put(v.getKey(), v.getValue()), LinkedHashMap::putAll);
-						break;
-		case TOP20: 	topXScoreDoc = scoreDoc.entrySet().stream().limit(20).
-											collect(LinkedHashMap::new, (k, v) -> k.put(v.getKey(), v.getValue()), LinkedHashMap::putAll);
-						break;
+			case TOP5:		topXScoreDoc = scoreDoc.entrySet().stream().limit(5).
+					collect(LinkedHashMap::new, (k, v) -> k.put(v.getKey(), v.getValue()), LinkedHashMap::putAll);
+				break;
+			case TOP10: 	topXScoreDoc = scoreDoc.entrySet().stream().limit(10).
+					collect(LinkedHashMap::new, (k, v) -> k.put(v.getKey(), v.getValue()), LinkedHashMap::putAll);
+				break;
+			case TOP20: 	topXScoreDoc = scoreDoc.entrySet().stream().limit(20).
+					collect(LinkedHashMap::new, (k, v) -> k.put(v.getKey(), v.getValue()), LinkedHashMap::putAll);
+				break;
 
-		case TOP100: 	topXScoreDoc = scoreDoc.entrySet().stream().limit(100).
-											collect(LinkedHashMap::new, (k, v) -> k.put(v.getKey(), v.getValue()), LinkedHashMap::putAll);
-						break;
-		case TOP1000: 	topXScoreDoc = scoreDoc.entrySet().stream().limit(1000).
-											collect(LinkedHashMap::new, (k, v) -> k.put(v.getKey(), v.getValue()), LinkedHashMap::putAll);
-						break;
-		default:		System.out.println("Limit not recognized. Returning all elements");
-						topXScoreDoc = scoreDoc;
+			case TOP100: 	topXScoreDoc = scoreDoc.entrySet().stream().limit(100).
+					collect(LinkedHashMap::new, (k, v) -> k.put(v.getKey(), v.getValue()), LinkedHashMap::putAll);
+				break;
+			case TOP1000: 	topXScoreDoc = scoreDoc.entrySet().stream().limit(1000).
+					collect(LinkedHashMap::new, (k, v) -> k.put(v.getKey(), v.getValue()), LinkedHashMap::putAll);
+				break;
+			default:		System.out.println("Limit not recognized. Returning all elements");
+				topXScoreDoc = scoreDoc;
 		}
 		return(topXScoreDoc);
 	}
-	
+
 	public void printScores(LinkedHashMap<String, Double> docScore) {
 		for(String docKey: docScore.keySet())
 			System.out.println("DocID: " + docKey + "\tScore: " + docScore.get(docKey));
 	}
-	
+
 	public String getFileName(Similarity sim) {
 		String f = "";
 		if(sim != null) {
 			String cname = sim.getClass().getName();
-			switch (cname) {
-				case "org.apache.lucene.search.similarities.ClassicSimilarity":
-					f = "VectorSpace";
-					break;
-				case "org.apache.lucene.search.similarities.BM25Similarity":
-					f = "BM25";
-					break;
-				case "org.apache.lucene.search.similarities.LMDirichletSimilarity":
-					f = "LMDrichlet";
-					break;
-				case "org.apache.lucene.search.similarities.LMJelinekMercerSimilarity":
-					f = "LMJelinkMercer";
-					break;
-			}
+			if(cname.equals("org.apache.lucene.search.similarities.ClassicSimilarity"))
+				f = "VectorSpace";
+			else if(cname.equals("org.apache.lucene.search.similarities.BM25Similarity"))
+				f = "BM25";
+			else if(cname.equals("org.apache.lucene.search.similarities.LMDirichletSimilarity"))
+				f = "LMDrichlet";
+			else if(cname.equals("org.apache.lucene.search.similarities.LMJelinekMercerSimilarity"))
+				f = "LMJelinkMercer";
 		}
 		else
 			f = "EasySearch";
