@@ -49,11 +49,12 @@ public class searchTRECtopics {
 	}
 
 	public static void main(String[] args) throws IOException, ParseException {
-		String indexPath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/input/index/";
-		String topicsPath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/input/topics.51-100";
-		String outputPath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/out/";
-		String relevancePath = "/home/nitesh/Study/Search/Assignment 3/Search_HW3/input/feedback.51-100.txt";
+		String indexPath = "/home/nitesh-jaswal/Study/Search/Assignment 3/Search_HW3/input/index/";
+		String topicsPath = "/home/nitesh-jaswal/Study/Search/Assignment 3/Search_HW3/input/topics.51-100";
+		String outputPath = "/home/nitesh-jaswal/Study/Search/Assignment 3/Search_HW3/out/";
+		String relevancePath = "/home/nitesh-jaswal/Study/Search/Assignment 3/Search_HW3/input/feedback.51-100.txt";
 
+		BooleanQuery.setMaxClauseCount(10000);
 		searchTRECtopics sObj = new searchTRECtopics(indexPath, outputPath, topicsPath, relevancePath);
 //		sObj.queryTest();
 		sObj.generateTopicResult(new ClassicSimilarity());
@@ -81,14 +82,16 @@ public class searchTRECtopics {
 	public void generateTopicResult(Similarity sim) throws ParseException, IOException {
 
 		LinkedHashMap<String, Double> shortQueryMap;
-		HashMap<Integer, HashMap<String, ArrayList<String>>> feedback = new HashMap<>();
-		HashMap<String, ArrayList<String>> query_feedback = new HashMap<>();
+		HashMap<Integer, HashMap<String, ArrayList<String>>> query_feedback = new HashMap<>();
 		String fname = getFileName(sim);
 
+		// Add your path here
 		File file = new File(topicsPath);
 		TrecTopicsReader topics = new TrecTopicsReader();
+		myRelevanceParser relevance_parser = new myRelevanceParser(relevancePath);
 
 		QualityQuery myQueries[] = topics.readQueries(new BufferedReader(new FileReader(file)));
+		query_feedback = relevance_parser.parseData();
 
 		String shortQueryTxt = "";
 
@@ -102,8 +105,9 @@ public class searchTRECtopics {
 			 */
 			String titleQuery = query.getValue("title").replaceFirst("[Tt][Oo][Pp][Ii][Cc]:", "").replace("/", " ");
 //			shortQueryMap = getSimilarityScores(titleQuery, sim);
-			shortQueryMap = getSimilarityScores(titleQuery, qId);
+			shortQueryMap = getSimilarityScores(titleQuery, query_feedback.get(qId));
 			shortQueryTxt += toText(shortQueryMap, qId, fname);
+//			break;
 		}
 		writeToFile(outputPath + fname + "shortQuery.txt", shortQueryTxt);
 	}
@@ -133,16 +137,14 @@ public class searchTRECtopics {
 		return(docScore);
 	}
 
-	private LinkedHashMap<String, Double> getSimilarityScores(String queryString, int qId) throws ParseException, IOException {
+	private LinkedHashMap<String, Double> getSimilarityScores(String queryString, HashMap<String, ArrayList<String>> query_feedback) throws ParseException, IOException {
 		LinkedHashMap<String, Double> docScore = new LinkedHashMap<String, Double>();
-		HashMap<String, ArrayList<String>> query_feedback;
-		String zone = "TEXT", rocchio_query;;
+		String zone = "TEXT", rocchio_query;
 		ClassicSimilarity sim = new ClassicSimilarity();
 		myRelevanceParser rel_parser = new myRelevanceParser(relevancePath);
 		MyRocchio rocchioObj = new MyRocchio();
 
-		query_feedback = rel_parser.parseData().get(qId);
-		rocchio_query = rocchioObj.getRocchioQuery(queryString, query_feedback);
+		rocchio_query = rocchioObj.getRocchioQueryString(queryString, query_feedback);
 		Analyzer analyzer = new StandardAnalyzer();
 		QueryParser parser = new QueryParser(zone, analyzer);
 
@@ -180,6 +182,7 @@ public class searchTRECtopics {
 		}
 		return(txt);
 	}
+
 	// Function not used but may come handy
 	public LinkedHashMap<String, Double> getTopX(LinkedHashMap<String, Double> scoreDoc, ENTRIES e) {
 		LinkedHashMap<String, Double> topXScoreDoc;

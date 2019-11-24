@@ -26,7 +26,6 @@ public class myRelevanceParser {
 
             String raw_text = main_sc.next();
             Queue<String> map_key = getMapKey(raw_text);
-
             Scanner sc = new Scanner(raw_text).useDelimiter("(<top>\\n<num>)|(<title>.*\n<relevant>)|(<title>.*\n<irrelevant>)|(<relevant>)" +
                     "|<irrelevant>");
             id = Integer.parseInt(sc.next().trim());
@@ -48,7 +47,6 @@ public class myRelevanceParser {
             sc.close();
         }
         main_sc.close();
-
         return (output);
     }
 
