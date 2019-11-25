@@ -37,12 +37,15 @@ public class searchTRECtopics {
 	private IndexReader reader;
 	private IndexSearcher searcher;
 	public enum ENTRIES {TOP5, TOP10, TOP20, TOP100, TOP1000, ALL};
+	private MyRocchio rocchioObj;
 
 	public searchTRECtopics(String i, String o, String t, String r) throws IOException {
 		indexPath = i;
 		outputPath = o;
 		topicsPath = t;
 		relevancePath = r;
+		rocchioObj = new MyRocchio(relevancePath);
+
 		reader = DirectoryReader.open(FSDirectory.open(Paths
 				.get(indexPath)));
 		searcher = new IndexSearcher(reader);
@@ -68,7 +71,7 @@ public class searchTRECtopics {
 		QueryParser parser = new QueryParser("TEXT", analyzer);
 		BoostQuery boosted_query = new BoostQuery(new TermQuery(new Term("TEXT", "airbus")), 10.0f);
 		System.out.println(boosted_query);
-		ScoreDoc[] t = searcher.search(boosted_query, 15).scoreDocs;
+		ScoreDoc[] t = searcher.search(boosted_query, 1000).scoreDocs;
 
 		for(ScoreDoc d: t) {
 			String docKey = searcher.doc(d.doc).get("DOCNO");
@@ -82,16 +85,14 @@ public class searchTRECtopics {
 	public void generateTopicResult(Similarity sim) throws ParseException, IOException {
 
 		LinkedHashMap<String, Double> shortQueryMap;
-		HashMap<Integer, HashMap<String, ArrayList<String>>> query_feedback = new HashMap<>();
 		String fname = getFileName(sim);
 
 		// Add your path here
 		File file = new File(topicsPath);
 		TrecTopicsReader topics = new TrecTopicsReader();
-		myRelevanceParser relevance_parser = new myRelevanceParser(relevancePath);
+
 
 		QualityQuery myQueries[] = topics.readQueries(new BufferedReader(new FileReader(file)));
-		query_feedback = relevance_parser.parseData();
 
 		String shortQueryTxt = "";
 
@@ -105,7 +106,7 @@ public class searchTRECtopics {
 			 */
 			String titleQuery = query.getValue("title").replaceFirst("[Tt][Oo][Pp][Ii][Cc]:", "").replace("/", " ");
 //			shortQueryMap = getSimilarityScores(titleQuery, sim);
-			shortQueryMap = getSimilarityScores(titleQuery, query_feedback.get(qId));
+			shortQueryMap = getSimilarityScores(titleQuery, qId);
 			shortQueryTxt += toText(shortQueryMap, qId, fname);
 //			break;
 		}
@@ -137,21 +138,16 @@ public class searchTRECtopics {
 		return(docScore);
 	}
 
-	private LinkedHashMap<String, Double> getSimilarityScores(String queryString, HashMap<String, ArrayList<String>> query_feedback) throws ParseException, IOException {
+	private LinkedHashMap<String, Double> getSimilarityScores(String queryString, int qId) throws ParseException, IOException {
 		LinkedHashMap<String, Double> docScore = new LinkedHashMap<String, Double>();
-		String zone = "TEXT", rocchio_query;
+		String zone = "TEXT";
+		Query rocchio_query;
 		ClassicSimilarity sim = new ClassicSimilarity();
-		myRelevanceParser rel_parser = new myRelevanceParser(relevancePath);
-		MyRocchio rocchioObj = new MyRocchio();
 
-		rocchio_query = rocchioObj.getRocchioQueryString(queryString, query_feedback);
-		Analyzer analyzer = new StandardAnalyzer();
-		QueryParser parser = new QueryParser(zone, analyzer);
-
-		Query query = parser.parse(rocchio_query);
+		rocchio_query = rocchioObj.getRocchioQuery(queryString, qId, 1.0f ,1.0f, 1.0f);
 		searcher.setSimilarity(sim);
 
-		ScoreDoc[] t = searcher.search(query, 1000).scoreDocs;
+		ScoreDoc[] t = searcher.search(rocchio_query, 1000).scoreDocs;
 
 		for(ScoreDoc d: t) {
 			String docKey = searcher.doc(d.doc).get("DOCNO");
