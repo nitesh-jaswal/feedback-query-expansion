@@ -1,3 +1,6 @@
+/*
+* Class to parse the relevance file and return the documents in the form of HashMaps
+*/
 import java.io.File;
 import java.io.IOException;
 import java.util.*;

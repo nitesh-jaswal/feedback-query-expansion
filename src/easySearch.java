@@ -41,15 +41,15 @@ public class easySearch {
 	
 	public static void main(String[] args)  throws ParseException, IOException {
 		String queryString = "Donald Trump";
-		easySearch obj = new easySearch("/home/nitesh/Study/Search/Assignment 3/Search_HW3/input/index/");
+		easySearch obj = new easySearch("F:\\Current Study\\Search\\Assignment 2\\retrieval-and-eval\\index");
 		System.out.println("Searching for query: " + queryString);
 		System.out.println("Searching in: " + "TEXT");
 //		obj.testSimilarity(queryString, "TEXT");
-//		LinkedHashMap<String, Double> sortedDocScore = obj.calculateScores("TEXT", queryString);
+//		LinkedHashMap<String, Double> sortedDocScore = obj.calculateDocScores("TEXT", queryString);
 //		obj.printScores(sortedDocScore);
 	}
 	
-	public LinkedHashMap<String, Double> calculateScores(String zone, String queryString) throws ParseException, IOException {
+	public LinkedHashMap<String, Double> calculateDocScores(String zone, String queryString) throws ParseException, IOException {
 		
 		LinkedHashMap<String, Double> docScore = new LinkedHashMap<String, Double>();
 		// Stores F(q,doc) for each doc 
@@ -129,13 +129,10 @@ public class easySearch {
 		}
 		printScores(docScore);
 	}
-	
-	
+
 	public void printScores(LinkedHashMap<String, Double> docScore) {
 		for(String docKey: docScore.keySet())
 			System.out.println("DocID: " + docKey + "\tScore: " + docScore.get(docKey));
-//		System.out.println(docScore.);
-//		System.out.println(docScore.keySet());
 	}
 	
 }
